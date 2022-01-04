@@ -1,11 +1,21 @@
 package com.github.tkutcher.jgrade;
 
-import com.github.tkutcher.jgrade.gradedtest.GradedTestListener;
-import com.github.tkutcher.jgrade.gradedtest.GradedTestResult;
-import org.junit.runner.JUnitCore;
 
 import java.util.ArrayList;
 import java.util.List;
+
+import com.github.tkutcher.jgrade.gradedtest.GradedTestResult;
+import com.github.tkutcher.jgrade.gradedtest.MyTestExecutionListener;
+
+import static org.junit.platform.engine.discovery.DiscoverySelectors.selectClass;
+
+import org.junit.platform.launcher.Launcher;
+import org.junit.platform.launcher.LauncherDiscoveryRequest;
+import org.junit.platform.launcher.LauncherSession;
+
+import org.junit.platform.launcher.TestPlan;
+import org.junit.platform.launcher.core.LauncherDiscoveryRequestBuilder;
+import org.junit.platform.launcher.core.LauncherFactory;
 
 
 /**
@@ -201,16 +211,26 @@ public class Grader {
      * created {@link GradedTestResult}s. If class <code>MyTests</code> has
      * graded test JUnit test methods, then call this method with
      * <code>MyTests.class</code>. Similarly can use JUnit's
-     * {@link org.junit.runners.Suite}. Can alter the list of results added from the
+     * {@link org.junit.platform.runners.Suite}. Can alter the list of results added from the
      * run by setting the {@link GraderStrategy}.
      * @param testSuite The class containing the tests.
      */
     public void runJUnitGradedTests(Class testSuite) {
-        GradedTestListener listener = new GradedTestListener();
-        JUnitCore runner = new JUnitCore();
-        runner.addListener(listener);
-        runner.run(testSuite);
-        List<GradedTestResult> results = listener.getGradedTestResults();
+
+        LauncherDiscoveryRequest request = LauncherDiscoveryRequestBuilder.request()
+                .selectors(selectClass(testSuite))
+                .build();
+
+        MyTestExecutionListener tel = new MyTestExecutionListener();
+
+        try (LauncherSession session = LauncherFactory.openSession()) {
+            Launcher launcher = session.getLauncher();
+            launcher.registerTestExecutionListeners(tel);
+            TestPlan testPlan = launcher.discover(request);
+            launcher.execute(testPlan);
+        }
+
+        List<GradedTestResult> results = tel.getGradedTestResults();
         this.graderStrategy.grade(results);
         this.gradedTestResults.addAll(results);
     }
